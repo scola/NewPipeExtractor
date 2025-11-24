@@ -37,53 +37,83 @@ public class YoutubeKidsSearchExtractor extends SearchExtractor {
         private JsonObject initialData;
 
         public YoutubeKidsSearchExtractor(final StreamingService service,
-                        final SearchQueryHandler linkHandler) {
+                                          final SearchQueryHandler linkHandler) {
                 super(service, linkHandler);
-                // YouTube Kids doesn't support search filters (videos-only, channels-only,
-                // etc.)
-                // So we always extract both video and channel results
                 extractVideoResults = true;
                 extractChannelResults = true;
         }
 
         @Override
         public void onFetchPage(@Nonnull final Downloader downloader)
-                        throws IOException, ExtractionException {
+                throws IOException, ExtractionException {
 
                 final String query = super.getSearchString();
 
-                // Build request JSON body based on the provided curl command
-                final JsonBuilder<JsonObject> bodyBuilder = prepareDesktopJsonBuilder(
-                                getExtractorLocalization(), getExtractorContentCountry())
-                                .value("context", prepareDesktopJsonBuilder(
-                                                getExtractorLocalization(), getExtractorContentCountry())
-                                                .value("client", prepareDesktopJsonBuilder(
-                                                                getExtractorLocalization(),
-                                                                getExtractorContentCountry())
-                                                                .value("clientName", "WEB_KIDS")
-                                                                .value("clientVersion", "2.20251120.00.00")
-                                                                .value("kidsAppInfo", prepareDesktopJsonBuilder(
-                                                                                getExtractorLocalization(),
-                                                                                getExtractorContentCountry())
-                                                                                .value("contentSettings",
-                                                                                                prepareDesktopJsonBuilder(
-                                                                                                                getExtractorLocalization(),
-                                                                                                                getExtractorContentCountry())
-                                                                                                                .value("corpusPreference",
-                                                                                                                                "KIDS_CORPUS_PREFERENCE_TWEEN")
-                                                                                                                .value("kidsNoSearchMode",
-                                                                                                                                "YT_KIDS_NO_SEARCH_MODE_OFF")
-                                                                                                                .done())
-                                                                                .done())
-                                                                .done())
-                                                .done())
+                final JsonBuilder<JsonObject> clientBuilder =
+                        prepareDesktopJsonBuilder(getExtractorLocalization(), getExtractorContentCountry())
+                                .value("clientName", "WEB_KIDS")
+                                .value("clientVersion", "2.20251120.00.00")
+                                .value("hl", "zh-CN")
+                                .value("gl", "US")
+                                .value("browserName", "Chrome")
+                                .value("browserVersion", "142.0.0.0")
+                                .value("osName", "Macintosh")
+                                .value("osVersion", "10_15_7")
+                                .value("platform", "DESKTOP")
+                                .value("rolloutToken", "COGg5tzb_9OIwAEQqv3UpNe-kAMYvNDB0omKkQM%3D")
+                                .value("kidsAppInfo",
+                                        prepareDesktopJsonBuilder(getExtractorLocalization(), getExtractorContentCountry())
+                                                .value("contentSettings",
+                                                        prepareDesktopJsonBuilder(getExtractorLocalization(), getExtractorContentCountry())
+                                                                .value("corpusPreference", "KIDS_CORPUS_PREFERENCE_TWEEN")
+                                                                .value("kidsNoSearchMode", "YT_KIDS_NO_SEARCH_MODE_OFF")
+                                                                .done()
+                                                )
+                                                .value("categorySettings",
+                                                        prepareDesktopJsonBuilder(getExtractorLocalization(), getExtractorContentCountry())
+                                                                .array("enabledCategories")
+                                                                .value("approved_for_you")
+                                                                .value("black_joy")
+                                                                .value("camp")
+                                                                .value("collections")
+                                                                .value("earth")
+                                                                .value("explore")
+                                                                .value("favorites")
+                                                                .value("gaming")
+                                                                .value("halloween")
+                                                                .value("hero")
+                                                                .value("learning")
+                                                                .value("making")
+                                                                .value("move")
+                                                                .value("music")
+                                                                .value("reading")
+                                                                .value("shared_by_parents")
+                                                                .value("shows")
+                                                                .value("soccer")
+                                                                .value("sports")
+                                                                .value("spotlight")
+                                                                .value("winter")
+                                                                .end()
+                                                                .done()
+                                                )
+                                                .done()
+                                );
+
+                final JsonBuilder<JsonObject> bodyBuilder =
+                        prepareDesktopJsonBuilder(getExtractorLocalization(), getExtractorContentCountry())
+                                .value("context",
+                                        prepareDesktopJsonBuilder(getExtractorLocalization(), getExtractorContentCountry())
+                                                .value("client", clientBuilder.done())
+                                                .done()
+                                )
                                 .value("query", query);
 
-                final byte[] postBody = JsonWriter.string(bodyBuilder.done())
-                                .getBytes(StandardCharsets.UTF_8);
+                final byte[] postBody =
+                        JsonWriter.string(bodyBuilder.done()).getBytes(StandardCharsets.UTF_8);
 
                 initialData = getJsonPostResponse("search", postBody, getExtractorLocalization());
         }
+
 
         @Nonnull
         @Override
@@ -95,33 +125,33 @@ public class YoutubeKidsSearchExtractor extends SearchExtractor {
         @Override
         public String getSearchSuggestion() throws ParsingException {
                 final JsonObject itemSectionRenderer = initialData.getObject("contents")
-                                .getObject("sectionListRenderer")
-                                .getArray("contents")
-                                .getObject(0)
-                                .getObject("itemSectionRenderer");
+                        .getObject("sectionListRenderer")
+                        .getArray("contents")
+                        .getObject(0)
+                        .getObject("itemSectionRenderer");
                 final JsonObject didYouMeanRenderer = itemSectionRenderer.getArray("contents")
-                                .getObject(0)
-                                .getObject("didYouMeanRenderer");
+                        .getObject(0)
+                        .getObject("didYouMeanRenderer");
 
                 if (!didYouMeanRenderer.isEmpty()) {
                         return JsonUtils.getString(didYouMeanRenderer,
-                                        "correctedQueryEndpoint.searchEndpoint.query");
+                                "correctedQueryEndpoint.searchEndpoint.query");
                 }
 
                 return Objects.requireNonNullElse(
-                                getTextFromObject(itemSectionRenderer.getArray("contents")
-                                                .getObject(0)
-                                                .getObject("showingResultsForRenderer")
-                                                .getObject("correctedQuery")),
-                                "");
+                        getTextFromObject(itemSectionRenderer.getArray("contents")
+                                .getObject(0)
+                                .getObject("showingResultsForRenderer")
+                                .getObject("correctedQuery")),
+                        "");
         }
 
         @Override
         public boolean isCorrectedSearch() throws ParsingException {
                 final JsonObject showingResultsForRenderer = initialData.getObject("contents")
-                                .getObject("sectionListRenderer").getArray("contents").getObject(0)
-                                .getObject("itemSectionRenderer").getArray("contents").getObject(0)
-                                .getObject("showingResultsForRenderer");
+                        .getObject("sectionListRenderer").getArray("contents").getObject(0)
+                        .getObject("itemSectionRenderer").getArray("contents").getObject(0)
+                        .getObject("showingResultsForRenderer");
                 return !showingResultsForRenderer.isEmpty();
         }
 
@@ -129,9 +159,9 @@ public class YoutubeKidsSearchExtractor extends SearchExtractor {
         @Override
         public List<MetaInfo> getMetaInfo() throws ParsingException {
                 return YoutubeMetaInfoHelper.getMetaInfo(
-                                initialData.getObject("contents")
-                                                .getObject("sectionListRenderer")
-                                                .getArray("contents"));
+                        initialData.getObject("contents")
+                                .getObject("sectionListRenderer")
+                                .getArray("contents"));
         }
 
         @Nonnull
@@ -144,7 +174,6 @@ public class YoutubeKidsSearchExtractor extends SearchExtractor {
                         JsonObject contents = initialData.getObject("contents");
                         if (contents.has("sectionListRenderer")) {
 
-                                // ① 先收集频道
                                 contents.getObject("sectionListRenderer")
                                         .getArray("contents").stream()
                                         .filter(JsonObject.class::isInstance)
@@ -160,7 +189,6 @@ public class YoutubeKidsSearchExtractor extends SearchExtractor {
                                                         content.getObject("compactChannelRenderer")));
                                         });
 
-                                // ② 再收集视频
                                 contents.getObject("sectionListRenderer")
                                         .getArray("contents").stream()
                                         .filter(JsonObject.class::isInstance)
