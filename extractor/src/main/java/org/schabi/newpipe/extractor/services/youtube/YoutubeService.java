@@ -28,6 +28,7 @@ import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeChannelEx
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeChannelTabExtractor;
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeCommentsExtractor;
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeFeedExtractor;
+import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeKidsSearchExtractor;
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeMixPlaylistExtractor;
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeMusicSearchExtractor;
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubePlaylistExtractor;
@@ -46,6 +47,7 @@ import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeChannelL
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeChannelTabLinkHandlerFactory;
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeCommentsLinkHandlerFactory;
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeKidsRecommendedLinkHandlerFactory;
+import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeKidsSearchQueryHandlerFactory;
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeLiveLinkHandlerFactory;
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubePlaylistLinkHandlerFactory;
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory;
@@ -116,7 +118,7 @@ public class YoutubeService extends StreamingService {
 
     @Override
     public SearchQueryHandlerFactory getSearchQHFactory() {
-        return YoutubeSearchQueryHandlerFactory.getInstance();
+        return YoutubeKidsSearchQueryHandlerFactory.getInstance();
     }
 
     @Override
@@ -154,7 +156,7 @@ public class YoutubeService extends StreamingService {
         if (!contentFilters.isEmpty() && contentFilters.get(0).startsWith("music_")) {
             return new YoutubeMusicSearchExtractor(this, query);
         } else {
-            return new YoutubeSearchExtractor(this, query);
+            return new YoutubeKidsSearchExtractor(this, query);
         }
     }
 
