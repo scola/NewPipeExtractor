@@ -70,7 +70,18 @@ public class YoutubeChannelInfoItemExtractor implements ChannelInfoItemExtractor
     @Override
     public String getName() throws ParsingException {
         try {
-            return getTextFromObject(channelInfoItem.getObject("title"));
+            // YouTube Kids uses "displayName" while regular YouTube uses "title"
+            // Check for field existence first to avoid exceptions
+            if (channelInfoItem.has("title")) {
+                final String name = getTextFromObject(channelInfoItem.getObject("title"));
+                if (name != null) {
+                    return name;
+                }
+            }
+            if (channelInfoItem.has("displayName")) {
+                return getTextFromObject(channelInfoItem.getObject("displayName"));
+            }
+            throw new ParsingException("Could not find name field (neither title nor displayName)");
         } catch (final Exception e) {
             throw new ParsingException("Could not get name", e);
         }
