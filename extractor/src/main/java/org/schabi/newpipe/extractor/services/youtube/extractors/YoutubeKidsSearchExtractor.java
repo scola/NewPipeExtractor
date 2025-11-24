@@ -140,40 +140,48 @@ public class YoutubeKidsSearchExtractor extends SearchExtractor {
                 final MultiInfoItemsCollector collector = new MultiInfoItemsCollector(getServiceId());
                 final TimeAgoParser timeAgoParser = getTimeAgoParser();
 
-                // Parse response based on the provided JSON structure
-                // contents -> sectionListRenderer -> contents -> [0] -> itemSectionRenderer ->
-                // contents
                 if (initialData != null && initialData.has("contents")) {
                         JsonObject contents = initialData.getObject("contents");
                         if (contents.has("sectionListRenderer")) {
+
+                                // ① 先收集频道
                                 contents.getObject("sectionListRenderer")
-                                                .getArray("contents").stream()
-                                                .filter(JsonObject.class::isInstance)
-                                                .map(JsonObject.class::cast)
-                                                .filter(obj -> obj.has("itemSectionRenderer"))
-                                                .map(obj -> obj.getObject("itemSectionRenderer"))
-                                                .flatMap(section -> section.getArray("contents").stream())
-                                                .filter(JsonObject.class::isInstance)
-                                                .map(JsonObject.class::cast)
-                                                .forEachOrdered(content -> {
-                                                        if (content.has("compactVideoRenderer")
-                                                                        && extractVideoResults) {
-                                                                collector.commit(new YoutubeStreamInfoItemExtractor(
-                                                                                content.getObject(
-                                                                                                "compactVideoRenderer"),
-                                                                                timeAgoParser));
-                                                        } else if (content.has("compactChannelRenderer")
-                                                                        && extractChannelResults) {
-                                                                collector.commit(new YoutubeChannelInfoItemExtractor(
-                                                                                content.getObject(
-                                                                                                "compactChannelRenderer")));
-                                                        }
-                                                });
+                                        .getArray("contents").stream()
+                                        .filter(JsonObject.class::isInstance)
+                                        .map(JsonObject.class::cast)
+                                        .filter(obj -> obj.has("itemSectionRenderer"))
+                                        .map(obj -> obj.getObject("itemSectionRenderer"))
+                                        .flatMap(section -> section.getArray("contents").stream())
+                                        .filter(JsonObject.class::isInstance)
+                                        .map(JsonObject.class::cast)
+                                        .filter(content -> content.has("compactChannelRenderer"))
+                                        .forEachOrdered(content -> {
+                                                collector.commit(new YoutubeChannelInfoItemExtractor(
+                                                        content.getObject("compactChannelRenderer")));
+                                        });
+
+                                // ② 再收集视频
+                                contents.getObject("sectionListRenderer")
+                                        .getArray("contents").stream()
+                                        .filter(JsonObject.class::isInstance)
+                                        .map(JsonObject.class::cast)
+                                        .filter(obj -> obj.has("itemSectionRenderer"))
+                                        .map(obj -> obj.getObject("itemSectionRenderer"))
+                                        .flatMap(section -> section.getArray("contents").stream())
+                                        .filter(JsonObject.class::isInstance)
+                                        .map(JsonObject.class::cast)
+                                        .filter(content -> content.has("compactVideoRenderer"))
+                                        .forEachOrdered(content -> {
+                                                collector.commit(new YoutubeStreamInfoItemExtractor(
+                                                        content.getObject("compactVideoRenderer"),
+                                                        timeAgoParser));
+                                        });
                         }
                 }
 
                 return new InfoItemsPage<>(collector, null);
         }
+
 
         @Override
         public InfoItemsPage<InfoItem> getPage(final Page page) throws IOException, ExtractionException {
