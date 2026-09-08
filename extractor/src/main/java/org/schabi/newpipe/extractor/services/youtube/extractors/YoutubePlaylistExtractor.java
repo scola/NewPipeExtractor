@@ -28,9 +28,10 @@ import org.schabi.newpipe.extractor.localization.TimeAgoParser;
 import org.schabi.newpipe.extractor.playlist.PlaylistExtractor;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper;
-import org.schabi.newpipe.extractor.stream.Description;
+import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamInfoItemLockupExtractor;import org.schabi.newpipe.extractor.stream.Description;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamInfoItemsCollector;
+import org.schabi.newpipe.extractor.utils.JsonUtils;
 import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.io.IOException;
@@ -61,6 +62,7 @@ public class YoutubePlaylistExtractor extends PlaylistExtractor {
     private JsonObject playlistHeader;
 
     private boolean isNewPlaylistInterface;
+    private Boolean isCoursePlaylist = null;
 
     public YoutubePlaylistExtractor(final StreamingService service,
                                     final ListLinkHandler linkHandler) {
@@ -173,6 +175,30 @@ public class YoutubePlaylistExtractor extends PlaylistExtractor {
         }
 
         return playlistHeader;
+    }
+
+    private Boolean isCoursePlaylist() {
+        if (isCoursePlaylist == null) {
+            try {
+                isCoursePlaylist = JsonUtils.getArray(getPlaylistHeader(),
+                    "onDescriptionTap.commandExecutorCommand.commands")
+                .stream()
+                .filter(JsonObject.class::isInstance)
+                .map(JsonObject.class::cast)
+                .anyMatch(object -> {
+                    try {
+                        final String tag = JsonUtils.getString(object,
+                            "showEngagementPanelEndpoint.identifier.tag");
+                        return tag.equals("engagement-panel-course-metadata");
+                    } catch (final ParsingException e) {
+                        return false;
+                    }
+                });
+            } catch (final Exception e) {
+                isCoursePlaylist = false;
+            }
+        }
+        return isCoursePlaylist;
     }
 
     @Nonnull
@@ -332,11 +358,18 @@ public class YoutubePlaylistExtractor extends PlaylistExtractor {
     public InfoItemsPage<StreamInfoItem> getInitialPage() throws IOException, ExtractionException {
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
 
-        final JsonArray initialItems = initialBrowseContinuationResponse
+        if (initialBrowseContinuationResponse == null) {
+            return new InfoItemsPage<>(collector, null);
+        }
+
+        JsonObject action = initialBrowseContinuationResponse
                 .getArray("onResponseReceivedActions")
-                .getObject(0)
-                .getObject("reloadContinuationItemsCommand")
-                .getArray("continuationItems");
+                .getObject(0);
+        
+        JsonArray initialItems = action.getObject("reloadContinuationItemsCommand").getArray("continuationItems");
+        if (initialItems == null || initialItems.isEmpty()) {
+            initialItems = action.getObject("appendContinuationItemsAction").getArray("continuationItems");
+        }
 
         collectStreamsFrom(collector, initialItems);
 
@@ -420,13 +453,30 @@ public class YoutubePlaylistExtractor extends PlaylistExtractor {
     private void collectStreamsFrom(@Nonnull final StreamInfoItemsCollector collector,
                                     @Nonnull final JsonArray videos) {
         final TimeAgoParser timeAgoParser = getTimeAgoParser();
-        videos.stream()
+        final PlaylistExtractor playlistExtractor = this;
+        videos.stream().peek(v -> System.out.println("DEBUG JSON: " + v.toString()))
                 .filter(JsonObject.class::isInstance)
                 .map(JsonObject.class::cast)
                 .forEach(video -> {
                     if (video.has(PLAYLIST_VIDEO_RENDERER)) {
                         collector.commit(new YoutubeStreamInfoItemExtractor(
-                                video.getObject(PLAYLIST_VIDEO_RENDERER), timeAgoParser));
+                                video.getObject(PLAYLIST_VIDEO_RENDERER), timeAgoParser) {
+                            @Override
+                            public String getUploaderName() throws ParsingException {
+                                if (isCoursePlaylist()) {
+                                    return playlistExtractor.getUploaderName();
+                                }
+                                return super.getUploaderName();
+                            }
+
+                            @Override
+                            public String getUploaderUrl() throws ParsingException {
+                                if (isCoursePlaylist()) {
+                                    return playlistExtractor.getUploaderUrl();
+                                }
+                                return super.getUploaderUrl();
+                            }
+                        });
                     } else if (video.has(RICH_ITEM_RENDERER)) {
                         final JsonObject richItemRenderer = video.getObject(RICH_ITEM_RENDERER);
                         if (richItemRenderer.has("content")) {
@@ -437,6 +487,25 @@ public class YoutubePlaylistExtractor extends PlaylistExtractor {
                                         richItemRendererContent.getObject(REEL_ITEM_RENDERER)));
                             }
                         }
+                    } else if (video.has("lockupViewModel")) {
+                        collector.commit(new YoutubeStreamInfoItemLockupExtractor(
+                                video.getObject("lockupViewModel"), timeAgoParser) {
+                            @Override
+                            public String getUploaderName() throws ParsingException {
+                                if (isCoursePlaylist()) {
+                                    return playlistExtractor.getUploaderName();
+                                }
+                                return super.getUploaderName();
+                            }
+
+                            @Override
+                            public String getUploaderUrl() throws ParsingException {
+                                if (isCoursePlaylist()) {
+                                    return playlistExtractor.getUploaderUrl();
+                                }
+                                return super.getUploaderUrl();
+                            }
+                        });
                     }
                 });
     }
